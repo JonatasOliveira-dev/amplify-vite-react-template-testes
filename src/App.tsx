@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import logo from "./assets/logo.png";
 import "./App.css";
+import { generateClient } from "aws-amplify/api";
+import { latestReadings } from "./graphql/queries";
 
+const client = generateClient();
 
 type Tab = "dashboard" | "calibracao";
 
@@ -18,7 +21,33 @@ function rand(min: number, max: number) {
   return Math.random() * (max - min) + min;
 }
 function fmtTime(d: Date) {
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function toDateFromAppSync(r: any): Date {
+  // Prioridade: timestamp_iso -> timestamp_ms -> agora
+  if (r?.timestamp_iso) {
+    const d = new Date(r.timestamp_iso);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  if (typeof r?.timestamp_ms === "number") return new Date(r.timestamp_ms);
+  return new Date();
+}
+
+function mapReading(r: any): EnvReading | null {
+  const temperature = Number(r?.temperatura);
+  const humidity = Number(r?.humidade);
+  if (!Number.isFinite(temperature) || !Number.isFinite(humidity)) return null;
+
+  return {
+    ts: toDateFromAppSync(r),
+    temperature,
+    humidity,
+  };
 }
 
 export default function App(props: { signOut?: () => void }) {
@@ -30,11 +59,19 @@ export default function App(props: { signOut?: () => void }) {
     temperature: 25.4,
     humidity: 58,
   }));
+
   const [history, setHistory] = useState<EnvReading[]>(() => [current]);
 
-  // Mock “tempo real”
+  // Estado de Live
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [isLiveLoading, setIsLiveLoading] = useState(false);
+
+  // Para evitar reprocessar leituras repetidas no polling:
+  const lastSeenTsMsRef = useRef<number>(0);
+
+  // ===== DEMO (mock “tempo real”) =====
   useEffect(() => {
-    if (!isDemo) return; // por enquanto, Live desliga mock
+    if (!isDemo) return; // em Live, desliga mock
     const id = setInterval(() => {
       setCurrent((prev) => {
         const next: EnvReading = {
@@ -50,8 +87,90 @@ export default function App(props: { signOut?: () => void }) {
     return () => clearInterval(id);
   }, [isDemo]);
 
+  // ===== LIVE (AppSync latestReadings + polling) =====
+  useEffect(() => {
+    if (isDemo) return;
+
+    let cancelled = false;
+
+    async function fetchLive() {
+      try {
+        setIsLiveLoading(true);
+        setLiveError(null);
+
+        const response: any = await client.graphql({
+          query: latestReadings,
+          variables: { deviceId: "device-01", limit: 40 },
+          authMode: "apiKey",
+        });
+
+        const itemsRaw = response?.data?.latestReadings ?? [];
+        const mapped: EnvReading[] = itemsRaw
+          .map(mapReading)
+          .filter(Boolean) as EnvReading[];
+
+        if (cancelled) return;
+
+        if (mapped.length === 0) return;
+
+        // Ordena do mais novo pro mais velho (por segurança)
+        mapped.sort((a, b) => b.ts.getTime() - a.ts.getTime());
+
+        const newest = mapped[0];
+        const newestMs = newest.ts.getTime();
+
+        // Evita ficar "pisando" no mesmo dado se o polling retornar igual
+        if (newestMs <= lastSeenTsMsRef.current) {
+          return;
+        }
+        lastSeenTsMsRef.current = newestMs;
+
+        // Atualiza current
+        setCurrent(newest);
+
+        // Atualiza history:
+        // Junta o que veio do backend com o que já estava, removendo duplicados por timestamp
+        setHistory((prev) => {
+          const combined = [...mapped, ...prev];
+
+          const seen = new Set<number>();
+          const deduped: EnvReading[] = [];
+          for (const r of combined) {
+            const key = r.ts.getTime();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            deduped.push(r);
+          }
+
+          // Garante mais novo primeiro
+          deduped.sort((a, b) => b.ts.getTime() - a.ts.getTime());
+          return deduped.slice(0, 40);
+        });
+      } catch (err: any) {
+        if (cancelled) return;
+        setLiveError(
+          err?.message
+            ? `Erro no Live: ${err.message}`
+            : "Erro no Live: falha ao buscar dados do AppSync"
+        );
+      } finally {
+        if (!cancelled) setIsLiveLoading(false);
+      }
+    }
+
+    // primeira carga
+    fetchLive();
+
+    // polling (ajuste aqui)
+    const id = setInterval(fetchLive, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [isDemo]);
+
   const status = useMemo(() => {
-    // regra simples de status (só visual)
     if (current.temperature >= 32) return { label: "ALERTA", tone: "warn" as const };
     return { label: "ONLINE", tone: "ok" as const };
   }, [current.temperature]);
@@ -102,6 +221,21 @@ export default function App(props: { signOut?: () => void }) {
 
       {/* Content */}
       <main className="ap-container">
+        {/* Aviso de Live */}
+        {!isDemo && (
+          <div style={{ marginBottom: 10 }}>
+            {isLiveLoading ? (
+              <div className="muted">Carregando dados do Live...</div>
+            ) : null}
+            {liveError ? (
+              <div style={{ color: "rgba(255,255,255,0.9)" }}>
+                <span style={{ color: "#ff6b6b" }}>{liveError}</span>
+                <span className="muted"> (verifique endpoint/apiKey/region no main.tsx)</span>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {tab === "dashboard" ? (
           <>
             <section className="ap-grid3">
@@ -109,7 +243,7 @@ export default function App(props: { signOut?: () => void }) {
                 title="TEMPERATURA"
                 value={current.temperature.toFixed(1)}
                 unit="°C"
-                hint="Leitura em tempo real"
+                hint={isDemo ? "Leitura em tempo real" : "Leitura em tempo real (AppSync)"}
                 accent="blue"
               />
               <MetricCard
@@ -139,14 +273,19 @@ export default function App(props: { signOut?: () => void }) {
                   </div>
                 </div>
 
-                {/* Gráfico simples (placeholder visual, sem libs) */}
                 <MiniChart history={history} />
               </div>
 
               <div className="ap-card ap-cardTall">
                 <div className="ap-cardHeader">
                   <h2>ÚLTIMAS LEITURAS</h2>
-                  <button className="ap-ghostBtn" onClick={() => setHistory([current])}>
+                  <button
+                    className="ap-ghostBtn"
+                    onClick={() => {
+                      lastSeenTsMsRef.current = current.ts.getTime();
+                      setHistory([current]);
+                    }}
+                  >
                     Limpar
                   </button>
                 </div>
@@ -173,7 +312,9 @@ export default function App(props: { signOut?: () => void }) {
                 </div>
 
                 <p className="ap-footnote">
-                  * Em “Live” vamos conectar no backend depois (AppSync/Dynamo/IoT).
+                  * {isDemo
+                    ? "Demo: dados simulados localmente."
+                    : "Live: dados vindo do DynamoDB via AppSync (polling)."}
                 </p>
               </div>
             </section>
@@ -184,9 +325,7 @@ export default function App(props: { signOut?: () => void }) {
               <div className="ap-bannerIcon">⚙️</div>
               <div>
                 <h2>Modo de Calibração</h2>
-                <p>
-                  Nesta primeira versão (UI), esta aba é apenas visual. Depois vamos ligar em comandos reais.
-                </p>
+                <p>Nesta primeira versão (UI), esta aba é apenas visual. Depois vamos ligar em comandos reais.</p>
               </div>
             </div>
 
@@ -272,7 +411,6 @@ function MetricCard(props: {
 }
 
 function MiniChart({ history }: { history: EnvReading[] }) {
-  // gráfico bem simples: só uma linha “bonita” pra UI (placeholder)
   const last = history.slice(0, 25).reverse();
   const temps = last.map((p) => p.temperature);
   const hums = last.map((p) => p.humidity);
