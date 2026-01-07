@@ -27,8 +27,8 @@
   "data": {
     "url": "https://7xlhoptxufcz3hznl4hf4ikjd4.appsync-api.us-east-1.amazonaws.com/graphql",
     "aws_region": "us-east-1",
-    "api_key": "da2-dtaqn7kadrhztmghdloh5ct5l4",
-    "default_authorization_type": "API_KEY",
+    
+    "default_authorization_type": "AMAZON_COGNITO_USER_POOLS",
     "authorization_types": [
       "AMAZON_COGNITO_USER_POOLS",
       "AWS_IAM"
