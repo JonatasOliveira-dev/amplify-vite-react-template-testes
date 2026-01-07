@@ -13,30 +13,13 @@ import {
 } from "@aws-amplify/ui-react";
 
 import App from "./App";
-import "./App.css"; // mantém seu tema do dashboard
+import "./App.css";
 import logo from "./assets/logo.png";
 
-Amplify.configure({
-  ...outputs,
-  API: {
-    ...(outputs as any).API,
-    GraphQL: {
-      // mantém o que já existir no outputs (se tiver)
-      ...((outputs as any).API?.GraphQL ?? {}),
+// ✅ CORRETO: usar o outputs direto (Gen 2)
+Amplify.configure(outputs);
 
-      // adiciona seu AppSync criado no console
-      aquapowerApi: {
-        endpoint: "https://7xlhoptxufcz3hznl4hf4ikjd4.appsync-api.us-east-1.amazonaws.com/graphql",
-        region: "us-east-1",
-        defaultAuthMode: "apiKey",
-        apiKey: "da2-dtaqn7kadrhztmghdloh5ct5l4",
-      },
-    },
-  },
-});
-
-
-/* ========= TEMA DO LOGIN ========= */
+/* ========= TEMA ========= */
 const theme = createTheme({
   name: "aquapower-theme",
   tokens: {
