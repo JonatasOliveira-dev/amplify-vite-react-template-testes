@@ -101,7 +101,7 @@ export default function App(props: { signOut?: () => void }) {
         const response: any = await client.graphql({
           query: latestReadings,
           variables: { deviceId: "device-01", limit: 40 },
-          authMode: "apiKey",
+          authMode: "userPool",
         });
 
         const itemsRaw = response?.data?.latestReadings ?? [];
