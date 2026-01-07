@@ -1,23 +1,10 @@
 version: 1
-backend:
-  phases:
-    build:
-      commands:
-        - npm ci --cache .npm --prefer-offline
-        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
-        # GERA o arquivo que seu front precisa:
-        - npx ampx generate outputs --app-id $AWS_APP_ID --branch $AWS_BRANCH --format json --out-dir .
-        # (debug) conferir se foi criado:
-        - ls -la
-        - test -f amplify_outputs.json && echo "OK: amplify_outputs.json gerado" || (echo "ERRO: amplify_outputs.json não existe" && exit 1)
 
 frontend:
   phases:
     preBuild:
       commands:
-        - npm ci --cache .npm --prefer-offline
-        # (debug) garantir que existe antes do build:
-        - test -f amplify_outputs.json && echo "OK: outputs presente no preBuild" || (echo "ERRO: outputs não chegou no frontend" && exit 1)
+        - npm ci
     build:
       commands:
         - npm run build
@@ -25,8 +12,8 @@ frontend:
   artifacts:
     baseDirectory: dist
     files:
-      - "**/*"
+      - '**/*'
+
   cache:
     paths:
-      - .npm/**/*
       - node_modules/**/*
