@@ -16,10 +16,10 @@ import App from "./App";
 import "./App.css";
 import logo from "./assets/logo.png";
 
-// ✅ CORRETO: usar o outputs direto (Gen 2)
-Amplify.configure(outputs); 
+// ✅ Não sobrescreve nada (sem endpoint/apiKey hardcoded)
+Amplify.configure(outputs);
 
-/* ========= TEMA ========= */
+/* ========= TEMA DO LOGIN ========= */
 const theme = createTheme({
   name: "aquapower-theme",
   tokens: {
