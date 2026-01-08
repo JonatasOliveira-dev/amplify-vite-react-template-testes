@@ -10,8 +10,10 @@ const schema = a.schema({
   Todo: a
     .model({
       content: a.string(),
+      // O campo isDone deve ficar aqui dentro
+      isDone: a.boolean(),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.authenticated()])
 });
 
 export type Schema = ClientSchema<typeof schema>;
