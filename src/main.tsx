@@ -17,7 +17,7 @@ import "./App.css";
 import logo from "./assets/logo.png";
 
 // ✅ CORRETO: usar o outputs direto (Gen 2)
-Amplify.configure(outputs);
+Amplify.configure(outputs); 
 
 /* ========= TEMA ========= */
 const theme = createTheme({
