@@ -63,22 +63,7 @@
           "syncable": true,
           "pluralName": "Todos",
           "attributes": [
-            {
-              "type": "model",
-              "properties": {}
-            },
-            {
-              "type": "auth",
-              "properties": {
-                "rules": [
-                  {
-                    "allow": "private",
-                    "provider": "userPools",
-                    "operations": ["create", "update", "delete", "read"]
-                  }
-                ]
-              }
-            }
+            { "type": "model", "properties": {} }
           ],
           "primaryKeyInfo": {
             "isCustomPrimaryKey": false,

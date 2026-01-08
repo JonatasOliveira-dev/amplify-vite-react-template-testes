@@ -16,7 +16,7 @@ import App from "./App";
 import "./App.css";
 import logo from "./assets/logo.png";
 
-// ✅ Não sobrescreve nada (sem endpoint/apiKey hardcoded)
+// ✅ Gen2: configure usando o outputs
 Amplify.configure(outputs);
 
 /* ========= TEMA DO LOGIN ========= */
