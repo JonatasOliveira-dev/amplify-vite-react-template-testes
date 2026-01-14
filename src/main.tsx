@@ -16,8 +16,32 @@ import App from "./App";
 import "./App.css";
 import logo from "./assets/logo.png";
 
-// ✅ usa EXATAMENTE o arquivo amplify_outputs.json da raiz
-Amplify.configure(outputs);
+/**
+ * ✅ CONFIG FINAL (User Pool + força endpoint correto)
+ * - Usa Auth do amplify_outputs.json
+ * - Força o endpoint do teu AppSync (pra não depender de outputs regenerado no deploy)
+ * - Sem apiKey
+ */
+const amplifyConfig = {
+  ...outputs,
+
+  API: {
+    // mantém qualquer config existente
+    ...((outputs as any).API ?? {}),
+
+    GraphQL: {
+      // ✅ FORÇA o endpoint certo do teu AppSync (o do console)
+      endpoint:
+        "https://7xlhoptxufcz3hznl4hf4ikjd4.appsync-api.us-east-1.amazonaws.com/graphql",
+      region: "us-east-1",
+
+      // ✅ USER POOL (sem API Key)
+      defaultAuthMode: "userPool",
+    },
+  },
+};
+
+Amplify.configure(amplifyConfig);
 
 /* ========= TEMA DO LOGIN ========= */
 const theme = createTheme({
