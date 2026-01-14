@@ -16,7 +16,7 @@ import App from "./App";
 import "./App.css";
 import logo from "./assets/logo.png";
 
-// ✅ Gen2: configure usando o outputs
+// ✅ usa EXATAMENTE o arquivo amplify_outputs.json da raiz
 Amplify.configure(outputs);
 
 /* ========= TEMA DO LOGIN ========= */
