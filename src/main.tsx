@@ -23,7 +23,7 @@ import logo from "./assets/logo.png";
  * - Sem apiKey
  */
 
-/*
+
 
 const amplifyConfig = {
   ...outputs,
@@ -45,7 +45,7 @@ const amplifyConfig = {
 };
 
 
-*/
+
 //Amplify.configure(amplifyConfig);
 Amplify.configure(outputs);
 
