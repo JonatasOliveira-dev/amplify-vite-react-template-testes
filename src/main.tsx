@@ -47,7 +47,7 @@ const amplifyConfig = {
 
 
 //Amplify.configure(amplifyConfig);
-Amplify.configure(outputs);
+//Amplify.configure(outputs);
 
 /* ========= TEMA DO LOGIN ========= */
 const theme = createTheme({
