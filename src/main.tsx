@@ -22,6 +22,9 @@ import logo from "./assets/logo.png";
  * - Força o endpoint do teu AppSync (pra não depender de outputs regenerado no deploy)
  * - Sem apiKey
  */
+
+/*
+
 const amplifyConfig = {
   ...outputs,
 
@@ -41,7 +44,10 @@ const amplifyConfig = {
   },
 };
 
-Amplify.configure(amplifyConfig);
+
+*/
+//Amplify.configure(amplifyConfig);
+Amplify.configure(outputs);
 
 /* ========= TEMA DO LOGIN ========= */
 const theme = createTheme({
