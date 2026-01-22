@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Amplify } from "aws-amplify";
-import outputs from "../amplify_outputs.json";
 
 import "@aws-amplify/ui-react/styles.css";
 import {
@@ -17,35 +16,66 @@ import "./App.css";
 import logo from "./assets/logo.png";
 
 /**
- * ✅ CONFIG FINAL (User Pool + força endpoint correto)
- * - Usa Auth do amplify_outputs.json
- * - Força o endpoint do teu AppSync (pra não depender de outputs regenerado no deploy)
- * - Sem apiKey
+ * Config híbrida do Amplify:
+ * - DEV: lê ../amplify_outputs.json (sandbox/local)
+ * - PROD: lê variáveis VITE_* (Amplify Hosting -> Variáveis de ambiente)
  */
+async function configureAmplify() {
+  const isProd = import.meta.env.PROD;
 
+  if (!isProd) {
+    // DEV: usa o outputs gerado pelo `npx ampx sandbox`
+    const outputsModule = await import("../amplify_outputs.json");
+    Amplify.configure(outputsModule.default);
+    return;
+  }
 
+  // PROD: usa env vars do Amplify Console
+  const region = import.meta.env.VITE_AWS_REGION as string | undefined;
+  const endpoint = import.meta.env.VITE_APPSYNC_ENDPOINT as string | undefined;
+  const userPoolId = import.meta.env.VITE_USER_POOL_ID as string | undefined;
+  const userPoolClientId = import.meta.env.VITE_USER_POOL_CLIENT_ID as
+    | string
+    | undefined;
 
-const amplifyConfig = {
-  ...outputs,
+  // Fail fast se estiver faltando algo
+  const missing: string[] = [];
+  if (!region) missing.push("VITE_AWS_REGION");
+  if (!endpoint) missing.push("VITE_APPSYNC_ENDPOINT");
+  if (!userPoolId) missing.push("VITE_USER_POOL_ID");
+  if (!userPoolClientId) missing.push("VITE_USER_POOL_CLIENT_ID");
 
-  API: {
-    // mantém qualquer config existente
-    ...((outputs as any).API ?? {}),
+  if (missing.length) {
+    throw new Error(
+      `Faltando variável(is) de ambiente em produção: ${missing.join(
+        ", "
+      )}. Configure no Amplify Console -> Hospedagem -> Variáveis de ambiente.`
+    );
+  }
 
-    GraphQL: {
-      // ✅ FORÇA o endpoint certo do teu AppSync (o do console)
-      endpoint:
-        "https://7xlhoptxufcz3hznl4hf4ikjd4.appsync-api.us-east-1.amazonaws.com/graphql",
-      region: "us-east-1",
+  // ✅ Força tipos após validação (para satisfazer o TypeScript)
+  const regionS = region!;
+  const endpointS = endpoint!;
+  const userPoolIdS = userPoolId!;
+  const userPoolClientIdS = userPoolClientId!;
 
-      // ✅ USER POOL (sem API Key)
-      defaultAuthMode: "userPool",
+  // ✅ Formato novo (compatível com Amplify Gen2 / aws-amplify atual)
+  Amplify.configure({
+    API: {
+      GraphQL: {
+        endpoint: endpointS,
+        region: regionS,
+        defaultAuthMode: "userPool",
+      },
     },
-  },
-};
-
-
-Amplify.configure(amplifyConfig);
+    Auth: {
+      Cognito: {
+        userPoolId: userPoolIdS,
+        userPoolClientId: userPoolClientIdS,
+      },
+    },
+  });
+} // ✅ FECHA configureAmplify AQUI
 
 /* ========= TEMA DO LOGIN ========= */
 const theme = createTheme({
@@ -87,27 +117,38 @@ const theme = createTheme({
   },
 });
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <Authenticator
-        components={{
-          Header() {
-            return (
-              <View textAlign="center" padding="1.5rem">
-                <Image
-                  alt="Aquapower"
-                  src={logo}
-                  width="120px"
-                  margin="0 auto 1rem"
-                />
-              </View>
-            );
-          },
-        }}
-      >
-        {({ signOut }) => <App signOut={signOut} />}
-      </Authenticator>
-    </ThemeProvider>
-  </React.StrictMode>
-);
+async function start() {
+  await configureAmplify();
+
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <ThemeProvider theme={theme}>
+        <Authenticator
+          components={{
+            Header() {
+              return (
+                <View textAlign="center" padding="1.5rem">
+                  <Image
+                    alt="Aquapower"
+                    src={logo}
+                    width="120px"
+                    margin="0 auto 1rem"
+                  />
+                </View>
+              );
+            },
+          }}
+        >
+          {({ signOut }) => <App signOut={signOut} />}
+        </Authenticator>
+      </ThemeProvider>
+    </React.StrictMode>
+  );
+}
+
+start().catch((err) => {
+  console.error("Failed to start app:", err);
+  document.body.innerHTML = `<pre style="padding:16px;color:#fff;background:#071225;white-space:pre-wrap;">${String(
+    err?.message ?? err
+  )}</pre>`;
+});
