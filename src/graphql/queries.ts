@@ -1,11 +1,15 @@
-export const latestReadings = `
-  query LatestReadings($deviceId: String!, $limit: Int) {
-    latestReadings(deviceId: $deviceId, limit: $limit) {
-      deviceId
-      timestamp_ms
-      timestamp_iso
-      temperatura
-      humidade
+export const latestDadosParque = /* GraphQL */ `
+  query LatestDadosParque($device: String!) {
+    latestDadosParque(device: $device) {
+      device
+      timestamp
+      registers {
+        TEMP
+        VOLTAGE
+        CURRENT
+        FREQUENCY
+        POWER
+      }
     }
   }
 `;

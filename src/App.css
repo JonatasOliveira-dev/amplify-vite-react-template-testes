@@ -384,3 +384,60 @@ body{
   background: rgba(255,255,255,.08);
   color: rgba(255,255,255,.55);
 }
+.ap-signout {
+  height: 36px;
+  padding: 0 14px;
+
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ap-signout:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.ap-signout:active {
+  transform: scale(0.96);
+}
+/* ===== Select (Dispositivo) no tema escuro ===== */
+.ap-select {
+  height: 36px;
+  padding: 0 12px;
+
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(10, 18, 36, 0.55);
+
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ap-select:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(10, 18, 36, 0.7);
+}
+
+.ap-select:focus {
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); /* leve highlight azul */
+}
+
+/* Opções (funciona bem no Chrome/Edge; pode variar por browser) */
+.ap-select option {
+  background: #0b1220; /* fundo escuro */
+  color: #ffffff;
+}

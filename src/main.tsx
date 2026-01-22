@@ -139,8 +139,11 @@ async function start() {
             },
           }}
         >
-          {({ signOut }) => <App signOut={signOut} />}
+          {({ signOut }: { signOut?: () => void }) => (
+            <App signOut={signOut} />
+          )}
         </Authenticator>
+
       </ThemeProvider>
     </React.StrictMode>
   );
