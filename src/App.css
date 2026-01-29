@@ -441,3 +441,180 @@ body{
   background: #0b1220; /* fundo escuro */
   color: #ffffff;
 }
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.metric-card {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 20px;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.metric-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  opacity: 0.85;
+}
+
+.metric-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.metric-value {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.metric-unit {
+  font-size: 18px;
+  margin-left: 6px;
+  opacity: 0.8;
+}
+
+.metric-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  width: 40%;
+  border-radius: 3px;
+}
+/* src/App.css - Adicione no final do arquivo */
+
+/* --- Laranja (Temperatura) --- */
+.ap-metricIcon.orange {
+  background-color: #f97316;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+}
+.ap-progressBar.orange {
+  background-color: #f97316;
+}
+.ap-metricValue.text {
+    color: #f97316; /* Caso use em texto */
+}
+
+/* --- Amarelo (Tensão) --- */
+.ap-metricIcon.yellow {
+  background-color: #eab308;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
+}
+.ap-progressBar.yellow {
+  background-color: #eab308;
+}
+/* --- CSS NOVO PARA O FINAL DO ARQUIVO --- */
+
+/* 1. MELHORIA NO SELETOR DE PERÍODO (TIME RANGE) */
+.ap-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.2s ease;
+}
+
+.ap-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* O Estado "Ativo" com destaque Azul Neon */
+.ap-chip[aria-pressed="true"] {
+  background: #0ea5e9; /* Azul do tema */
+  border-color: #0ea5e9;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.4); /* Brilho */
+}
+
+/* 2. NOVAS TAGS DE DADOS (SUBSTITUI OS CHECKBOXES) */
+.ap-toggles-container {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ap-toggle-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.4); /* Cor quando desativado */
+  transition: all 0.2s;
+  user-select: none;
+}
+
+/* A bolinha colorida */
+.ap-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+  box-shadow: 0 0 5px currentColor;
+}
+
+/* --- CORES QUANDO ATIVO --- */
+
+/* Temperatura (Laranja) */
+.ap-toggle-chip.active.TEMP {
+  background: rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.5);
+  color: #f97316;
+}
+
+/* Tensão (Amarelo) */
+.ap-toggle-chip.active.VOLTAGE {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: rgba(234, 179, 8, 0.5);
+  color: #eab308;
+}
+
+/* Corrente (Verde) */
+.ap-toggle-chip.active.CURRENT {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.5);
+  color: #4ade80;
+}
+
+/* Frequência (Roxo) */
+.ap-toggle-chip.active.FREQUENCY {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: rgba(167, 139, 250, 0.5);
+  color: #a78bfa;
+}
+
+/* Potência (Azul) */
+.ap-toggle-chip.active.POWER {
+  background: rgba(96, 165, 250, 0.15);
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #60a5fa;
+}
