@@ -16,6 +16,7 @@ import {
   Tooltip,
   Legend,
   CartesianGrid,
+  ReferenceArea,
 } from "recharts";
 
 const client = generateClient();
@@ -31,7 +32,7 @@ type Registers = {
 
 type DeviceReading = {
   device: string;
-  timestamp: number; // unix seconds
+  timestamp: number;
   registers: Registers;
 };
 
@@ -44,7 +45,6 @@ const AVAILABLE_DEVICES = ["B1", "B2", "B3"] as const;
 
 type RangeKey = "1D" | "7D" | "30D" | "ALL";
 
-// Segundos para subtrair do "agora" em cada opção
 const RANGE_SECONDS: Record<Exclude<RangeKey, "ALL">, number> = {
   "1D": 86400,
   "7D": 604800,
@@ -68,15 +68,11 @@ function formatTick(tsSeconds: number, range: RangeKey) {
 }
 
 export default function App({ signOut }: AppProps) {
-  // Estado do Dispositivo selecionado
   const [device, setDevice] = useState("B2");
-
-  // Estados de Dados
   const [latest, setLatest] = useState<DeviceReading | null>(null);
   const [history, setHistory] = useState<DeviceReading[]>([]);
-
-  // Controles da Interface
   const [range, setRange] = useState<RangeKey>("1D");
+  
   const [visible, setVisible] = useState<VisibleMap>({
     TEMP: true,
     VOLTAGE: false,
@@ -85,19 +81,55 @@ export default function App({ signOut }: AppProps) {
     POWER: false,
   });
 
-  // Estados de Carregamento e Erro
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  // --- ESTADOS DO ZOOM ---
+  // "dataMin" e "dataMax" são strings especiais do Recharts para "Auto Ajuste"
+  const [left, setLeft] = useState<number | "dataMin">("dataMin");
+  const [right, setRight] = useState<number | "dataMax">("dataMax");
+  
+  // Variáveis temporárias enquanto arrasta o mouse
+  const [refAreaLeft, setRefAreaLeft] = useState<number | null>(null);
+  const [refAreaRight, setRefAreaRight] = useState<number | null>(null);
+
   const requestIdRef = useRef(0);
   const lastTsRef = useRef<number | null>(null);
-
   const POLL_MS = 10_000;
+
+  // --- LÓGICA DO ZOOM ---
+  const zoom = () => {
+    if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
+      setRefAreaLeft(null);
+      setRefAreaRight(null);
+      return;
+    }
+
+    // Organiza: Garante que o menor valor fique na esquerda
+    let newLeft = refAreaLeft;
+    let newRight = refAreaRight;
+    if (newLeft > newRight) [newLeft, newRight] = [newRight, newLeft];
+
+    // Aplica o zoom e limpa a seleção
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+    setLeft(newLeft);
+    setRight(newRight);
+  };
+
+  const zoomOut = () => {
+    setLeft("dataMin");
+    setRight("dataMax");
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+  };
 
   // 1. BUSCAR HISTÓRICO
   async function fetchHistory(selectedDevice: string, selectedRange: RangeKey) {
     setLoading(true);
     setErrMsg(null);
+    zoomOut(); // Reseta zoom ao trocar filtros
+    
     try {
       const now = Math.floor(Date.now() / 1000);
       let from = now - 86400;
@@ -132,14 +164,10 @@ export default function App({ signOut }: AppProps) {
         nextToken = data?.nextToken;
         safetyCounter++;
 
-        if (safetyCounter > 20) {
-            console.warn("Limite de segurança atingido (20k pontos).");
-            break;
-        }
-
+        if (safetyCounter > 20) break;
       } while (nextToken);
 
-      console.log(`[Histórico] Total carregado: ${allItems.length} pontos.`);
+      console.log(`[Histórico] Pontos: ${allItems.length}`);
       
       const normalizedHistory: DeviceReading[] = allItems.map((item: any) => ({
         device: selectedDevice,
@@ -161,17 +189,16 @@ export default function App({ signOut }: AppProps) {
       }
 
     } catch (error: any) {
-      console.error("Erro ao buscar histórico:", error);
-      setErrMsg("Erro ao carregar histórico. Verifique o console.");
+      console.error("Erro:", error);
+      setErrMsg("Erro ao carregar histórico.");
     } finally {
       setLoading(false);
     }
   }
 
-  // 2. POLLING (LATEST)
+  // 2. POLLING
   async function fetchLatest(selectedDevice: string) {
     const requestId = ++requestIdRef.current;
-    
     try {
       const res = await client.graphql({
         query: latestDadosParque,
@@ -180,7 +207,6 @@ export default function App({ signOut }: AppProps) {
       });
 
       if (requestId !== requestIdRef.current) return;
-
       const data = (res as any)?.data?.latestDadosParque as DeviceReading | null;
 
       if (!data) return;
@@ -201,7 +227,6 @@ export default function App({ signOut }: AppProps) {
 
       if (lastTsRef.current !== normalized.timestamp) {
         lastTsRef.current = normalized.timestamp;
-
         setHistory((prev) => {
           const next = [...prev, normalized];
           if (next.length > 5000) next.shift(); 
@@ -209,7 +234,7 @@ export default function App({ signOut }: AppProps) {
         });
       }
     } catch (e: any) {
-      console.error("Erro no polling latest:", e);
+      console.error("Erro polling:", e);
     }
   }
 
@@ -289,16 +314,7 @@ export default function App({ signOut }: AppProps) {
 
       <main className="ap-container">
         {errMsg && (
-          <div
-            style={{
-              marginBottom: 12,
-              padding: 10,
-              borderRadius: 8,
-              background: "rgba(255,0,0,0.08)",
-              color: "#ffcccc",
-              border: "1px solid #ff000033"
-            }}
-          >
+          <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: "rgba(255,0,0,0.08)", color: "#ffcccc", border: "1px solid #ff000033" }}>
             <b>Aviso:</b> {errMsg}
           </div>
         )}
@@ -361,7 +377,7 @@ export default function App({ signOut }: AppProps) {
           />
         </section>
 
-        {/* --- CONTROLES MODIFICADOS AQUI (Tirei os Checkboxes) --- */}
+        {/* CONTROLES */}
         <div
           style={{
             display: "flex",
@@ -373,7 +389,6 @@ export default function App({ signOut }: AppProps) {
             flexWrap: "wrap",
           }}
         >
-          {/* SELETOR DE PERÍODO */}
           <div style={{ display: "flex", gap: 8 }}>
             {(["1D", "7D", "30D", "ALL"] as RangeKey[]).map((k) => (
               <button
@@ -387,7 +402,6 @@ export default function App({ signOut }: AppProps) {
             ))}
           </div>
 
-          {/* SELETOR DE DADOS (NOVO VISUAL - Tags Coloridas) */}
           <div className="ap-toggles-container">
             {[
               { key: "TEMP", label: "Temperatura" },
@@ -402,7 +416,6 @@ export default function App({ signOut }: AppProps) {
               return (
                 <div
                   key={k}
-                  /* Aplica a classe "active" e o nome da chave (TEMP, VOLTAGE) para o CSS pintar a cor certa */
                   className={`ap-toggle-chip ${k} ${isActive ? "active" : ""}`}
                   onClick={() => toggleVisible(k)}
                 >
@@ -414,7 +427,7 @@ export default function App({ signOut }: AppProps) {
           </div>
         </div>
 
-        {/* GRÁFICO */}
+        {/* GRÁFICO COM ZOOM */}
         <section
           style={{
             height: 360,
@@ -423,10 +436,34 @@ export default function App({ signOut }: AppProps) {
             borderRadius: 16,
             border: "1px solid rgba(255,255,255,0.12)",
             background: "rgba(0,0,0,0.12)",
+            userSelect: "none", // Impede selecionar texto enquanto arrasta
           }}
         >
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
-            Série temporal ({range === "ALL" ? "Histórico Completo" : range})
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>
+              Série temporal ({range === "ALL" ? "Histórico Completo" : range})
+            </div>
+            
+            {/* Botão de Reset só aparece se estiver com zoom */}
+            {left !== "dataMin" && (
+              <button 
+                onClick={zoomOut}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#fff',
+                  borderRadius: 4,
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5
+                }}
+              >
+                🔍 Resetar Zoom
+              </button>
+            )}
           </div>
 
           {chartData.length < 2 ? (
@@ -435,10 +472,21 @@ export default function App({ signOut }: AppProps) {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
+              {/* Eventos de Mouse no Gráfico */}
+              <LineChart 
+                data={chartData}
+                onMouseDown={(e: any) => e && e.activeLabel && setRefAreaLeft(e.activeLabel)}
+                onMouseMove={(e: any) => refAreaLeft && e && e.activeLabel && setRefAreaRight(e.activeLabel)}
+                onMouseUp={zoom}
+              >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                
+                {/* O Eixo X é controlado pelo estado left/right */}
                 <XAxis
                   dataKey="timestamp"
+                  allowDataOverflow={true} // NECESSÁRIO para o zoom funcionar
+                  domain={[left, right]}
+                  type="number"
                   tickFormatter={(v: any) => formatTick(Number(v), range)}
                   minTickGap={30}
                   stroke="rgba(255,255,255,0.5)"
@@ -452,21 +500,33 @@ export default function App({ signOut }: AppProps) {
                 />
                 <Legend />
 
+                {/* Linhas sem animação para o zoom ser instantâneo */}
                 {visible.TEMP && (
-                  <Line type="monotone" dataKey="TEMP" name="Temperatura" dot={false} strokeWidth={2} stroke="#f97316" />
+                  <Line type="monotone" dataKey="TEMP" name="Temperatura" dot={false} strokeWidth={2} stroke="#f97316" isAnimationActive={false} />
                 )}
                 {visible.VOLTAGE && (
-                  <Line type="monotone" dataKey="VOLTAGE" name="Tensão" dot={false} strokeWidth={2} stroke="#eab308" />
+                  <Line type="monotone" dataKey="VOLTAGE" name="Tensão" dot={false} strokeWidth={2} stroke="#eab308" isAnimationActive={false} />
                 )}
                 {visible.CURRENT && (
-                  <Line type="monotone" dataKey="CURRENT" name="Corrente" dot={false} strokeWidth={2} stroke="#4ade80" />
+                  <Line type="monotone" dataKey="CURRENT" name="Corrente" dot={false} strokeWidth={2} stroke="#4ade80" isAnimationActive={false} />
                 )}
                 {visible.FREQUENCY && (
-                  <Line type="monotone" dataKey="FREQUENCY" name="Frequência" dot={false} strokeWidth={2} stroke="#a78bfa" />
+                  <Line type="monotone" dataKey="FREQUENCY" name="Frequência" dot={false} strokeWidth={2} stroke="#a78bfa" isAnimationActive={false} />
                 )}
                 {visible.POWER && (
-                  <Line type="monotone" dataKey="POWER" name="Potência" dot={false} strokeWidth={2} stroke="#60a5fa" />
+                  <Line type="monotone" dataKey="POWER" name="Potência" dot={false} strokeWidth={2} stroke="#60a5fa" isAnimationActive={false} />
                 )}
+
+                {/* Retângulo de Seleção (Destaque visual) */}
+                {refAreaLeft && refAreaRight ? (
+                  <ReferenceArea 
+                    x1={refAreaLeft} 
+                    x2={refAreaRight} 
+                    strokeOpacity={0.3} 
+                    fill="rgba(255, 0, 0, 0.3)" /* Vermelho para teste de visibilidade */
+                  />
+                ) : null}
+
               </LineChart>
             </ResponsiveContainer>
           )}
