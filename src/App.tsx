@@ -143,10 +143,10 @@ export default function App({ signOut }: AppProps) {
         // Validação básica
         if (!customStart || !customEnd) return;
         
-        // Converte strings YYYY-MM-DD para Timestamp
-        // Adiciona T00:00:00 para garantir hora local correta
-        const startDate = new Date(customStart + "T00:00:00");
-        const endDate = new Date(customEnd + "T23:59:59");
+        // O input type="datetime-local" já retorna formato "YYYY-MM-DDTHH:mm"
+        // O construtor Date() do JS entende isso e cria o timestamp correto
+        const startDate = new Date(customStart);
+        const endDate = new Date(customEnd);
         
         from = Math.floor(startDate.getTime() / 1000);
         to = Math.floor(endDate.getTime() / 1000);
@@ -306,6 +306,60 @@ export default function App({ signOut }: AppProps) {
     setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
+  // --------------------------------------------------------------------------
+  // 3. EXPORTAR CSV (Baixa exatamente o que está na tela)
+  // --------------------------------------------------------------------------
+  function handleExportCSV() {
+    if (history.length === 0) {
+      alert("Não há dados carregados para exportar.");
+      return;
+    }
+
+    // 1. Define o Cabeçalho (Header)
+    const headers = ["DataHora", "Timestamp", "Dispositivo"];
+    
+    // Adiciona apenas as colunas que estão ativas (Tags coloridas)
+    const activeKeys = (Object.keys(visible) as (keyof Registers)[]).filter(
+      (k) => visible[k]
+    );
+    headers.push(...activeKeys);
+
+    // 2. Monta as Linhas (Rows)
+    const csvRows = history.map((item) => {
+      // Formata data para padrão brasileiro (DD/MM/AAAA HH:mm:ss)
+      const dateTime = new Date(item.timestamp * 1000).toLocaleString("pt-BR");
+      
+      const rowData = [
+        `"${dateTime}"`,      // Aspas para evitar quebra no Excel
+        item.timestamp,
+        item.device,
+      ];
+
+      // Adiciona os valores das colunas ativas
+      activeKeys.forEach((key) => {
+        const val = item.registers[key];
+        // Dica: Se quiser padrão Excel Brasil (vírgula decimal), use: val?.toString().replace('.', ',')
+        rowData.push(val !== null ? val.toString() : ""); 
+      });
+
+      return rowData.join(",");
+    });
+
+    // 3. Junta tudo e cria o arquivo
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    
+    // 4. Dispara o download
+    const link = document.createElement("a");
+    link.href = url;
+    const dateStr = new Date().toISOString().split("T")[0];
+    link.setAttribute("download", `dados_${device}_${range}_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   // --- RENDERIZAÇÃO ---
   return (
     <div className="ap-page">
@@ -437,7 +491,7 @@ export default function App({ signOut }: AppProps) {
             {range === "CUSTOM" && (
                 <div className="ap-date-container">
                     <input 
-                        type="date" 
+                        type="datetime-local" 
                         className="ap-date-input"
                         value={customStart}
                         onChange={(e) => setCustomStart(e.target.value)}
@@ -445,7 +499,7 @@ export default function App({ signOut }: AppProps) {
                     />
                     <span style={{color: 'rgba(255,255,255,0.5)', fontSize: 12}}>até</span>
                     <input 
-                        type="date" 
+                        type="datetime-local" 
                         className="ap-date-input"
                         value={customEnd}
                         onChange={(e) => setCustomEnd(e.target.value)}
@@ -456,6 +510,16 @@ export default function App({ signOut }: AppProps) {
                     </button>
                 </div>
             )}
+
+            {/*  NOVO BOTÃO DE EXPORTAR AQUI  */}
+            <button 
+              className="ap-btn-export" 
+              onClick={handleExportCSV}
+              title="Baixar dados atuais em CSV"
+            >
+              📥 CSV
+            </button>
+
           </div>
 
           <div className="ap-toggles-container">
@@ -468,6 +532,8 @@ export default function App({ signOut }: AppProps) {
             ].map((item) => {
               const k = item.key as keyof Registers;
               const isActive = visible[k];
+
+              
 
               return (
                 <div
