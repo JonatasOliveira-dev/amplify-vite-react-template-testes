@@ -618,3 +618,53 @@ body{
   border-color: rgba(96, 165, 250, 0.5);
   color: #60a5fa;
 }
+/* --- Date Picker & Inputs Personalizados --- */
+.ap-date-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: fadeIn 0.3s ease;
+}
+
+.ap-date-input {
+  background: rgba(11, 23, 48, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  color-scheme: dark; /* Força o ícone do calendário ficar branco/escuro */
+}
+
+.ap-date-input:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+
+.ap-btn-search {
+  background: #0ea5e9;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ap-btn-search:hover {
+  background: #38bdf8;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}

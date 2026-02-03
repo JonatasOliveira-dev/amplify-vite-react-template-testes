@@ -43,9 +43,11 @@ type AppProps = {
 // --- CONSTANTES ---
 const AVAILABLE_DEVICES = ["B1", "B2", "B3"] as const;
 
-type RangeKey = "1D" | "7D" | "30D" | "ALL";
+// Adicionamos "CUSTOM" aqui
+type RangeKey = "1D" | "7D" | "30D" | "ALL" | "CUSTOM";
 
-const RANGE_SECONDS: Record<Exclude<RangeKey, "ALL">, number> = {
+// Removemos CUSTOM e ALL da lista de segundos fixos, pois têm lógica própria
+const RANGE_SECONDS: Record<Exclude<RangeKey, "ALL" | "CUSTOM">, number> = {
   "1D": 86400,
   "7D": 604800,
   "30D": 2592000,
@@ -71,8 +73,13 @@ export default function App({ signOut }: AppProps) {
   const [device, setDevice] = useState("B2");
   const [latest, setLatest] = useState<DeviceReading | null>(null);
   const [history, setHistory] = useState<DeviceReading[]>([]);
+  
   const [range, setRange] = useState<RangeKey>("1D");
   
+  // NOVOS ESTADOS PARA DATA PERSONALIZADA
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+
   const [visible, setVisible] = useState<VisibleMap>({
     TEMP: true,
     VOLTAGE: false,
@@ -85,11 +92,8 @@ export default function App({ signOut }: AppProps) {
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
   // --- ESTADOS DO ZOOM ---
-  // "dataMin" e "dataMax" são strings especiais do Recharts para "Auto Ajuste"
   const [left, setLeft] = useState<number | "dataMin">("dataMin");
   const [right, setRight] = useState<number | "dataMax">("dataMax");
-  
-  // Variáveis temporárias enquanto arrasta o mouse
   const [refAreaLeft, setRefAreaLeft] = useState<number | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<number | null>(null);
 
@@ -104,13 +108,10 @@ export default function App({ signOut }: AppProps) {
       setRefAreaRight(null);
       return;
     }
-
-    // Organiza: Garante que o menor valor fique na esquerda
     let newLeft = refAreaLeft;
     let newRight = refAreaRight;
     if (newLeft > newRight) [newLeft, newRight] = [newRight, newLeft];
 
-    // Aplica o zoom e limpa a seleção
     setRefAreaLeft(null);
     setRefAreaRight(null);
     setLeft(newLeft);
@@ -128,14 +129,27 @@ export default function App({ signOut }: AppProps) {
   async function fetchHistory(selectedDevice: string, selectedRange: RangeKey) {
     setLoading(true);
     setErrMsg(null);
-    zoomOut(); // Reseta zoom ao trocar filtros
+    zoomOut();
     
     try {
       const now = Math.floor(Date.now() / 1000);
       let from = now - 86400;
+      let to = now;
 
+      // Lógica de Datas
       if (selectedRange === "ALL") {
-        from = 1704067200;
+        from = 1704067200; // 01/01/2024
+      } else if (selectedRange === "CUSTOM") {
+        // Validação básica
+        if (!customStart || !customEnd) return;
+        
+        // Converte strings YYYY-MM-DD para Timestamp
+        // Adiciona T00:00:00 para garantir hora local correta
+        const startDate = new Date(customStart + "T00:00:00");
+        const endDate = new Date(customEnd + "T23:59:59");
+        
+        from = Math.floor(startDate.getTime() / 1000);
+        to = Math.floor(endDate.getTime() / 1000);
       } else {
         from = now - RANGE_SECONDS[selectedRange];
       }
@@ -150,7 +164,7 @@ export default function App({ signOut }: AppProps) {
           variables: {
             device: selectedDevice,
             from: from,
-            to: now,
+            to: to,
             limit: 1000,
             nextToken: nextToken
           },
@@ -164,7 +178,7 @@ export default function App({ signOut }: AppProps) {
         nextToken = data?.nextToken;
         safetyCounter++;
 
-        if (safetyCounter > 20) break;
+        if (safetyCounter > 30) break; // Limite de segurança aumentado
       } while (nextToken);
 
       console.log(`[Histórico] Pontos: ${allItems.length}`);
@@ -196,7 +210,17 @@ export default function App({ signOut }: AppProps) {
     }
   }
 
-  // 2. POLLING
+  // 2. BUSCA MANUAL (Para o botão "Buscar")
+  const handleCustomSearch = () => {
+    if (!customStart || !customEnd) {
+        alert("Por favor, selecione as datas de Início e Fim.");
+        return;
+    }
+    // Força a busca com o modo CUSTOM
+    fetchHistory(device, "CUSTOM");
+  };
+
+  // 3. POLLING (Latest)
   async function fetchLatest(selectedDevice: string) {
     const requestId = ++requestIdRef.current;
     try {
@@ -227,19 +251,26 @@ export default function App({ signOut }: AppProps) {
 
       if (lastTsRef.current !== normalized.timestamp) {
         lastTsRef.current = normalized.timestamp;
-        setHistory((prev) => {
-          const next = [...prev, normalized];
-          if (next.length > 5000) next.shift(); 
-          return next;
-        });
+        
+        // Só adiciona ao histórico automático se NÃO estivermos vendo um período passado customizado
+        if (range !== "CUSTOM" && range !== "ALL") {
+            setHistory((prev) => {
+              const next = [...prev, normalized];
+              if (next.length > 5000) next.shift(); 
+              return next;
+            });
+        }
       }
     } catch (e: any) {
       console.error("Erro polling:", e);
     }
   }
 
-  // EFEITOS
+  // EFEITO: Monitora Mudanças de Range
   useEffect(() => {
+    // Se for CUSTOM, NÃO busca automaticamente (espera o botão Buscar)
+    if (range === "CUSTOM") return;
+
     setHistory([]); 
     setLatest(null);
     lastTsRef.current = null;
@@ -252,7 +283,7 @@ export default function App({ signOut }: AppProps) {
       fetchLatest(device);
     }, POLL_MS);
     return () => window.clearInterval(id);
-  }, [device]);
+  }, [device, range]);
 
   const status = useMemo(() => {
     const temp = latest?.registers?.TEMP ?? 0;
@@ -389,17 +420,42 @@ export default function App({ signOut }: AppProps) {
             flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", gap: 8 }}>
-            {(["1D", "7D", "30D", "ALL"] as RangeKey[]).map((k) => (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {/* Botões de Período Padrão */}
+            {(["1D", "7D", "30D", "ALL", "CUSTOM"] as RangeKey[]).map((k) => (
               <button
                 key={k}
                 className="ap-chip"
                 onClick={() => setRange(k)}
                 aria-pressed={range === k}
               >
-                {k === "ALL" ? "Tudo" : k}
+                {k === "ALL" ? "Tudo" : k === "CUSTOM" ? "Personalizado" : k}
               </button>
             ))}
+
+            {/* SE CUSTOM SELECIONADO: Mostra Inputs de Data */}
+            {range === "CUSTOM" && (
+                <div className="ap-date-container">
+                    <input 
+                        type="date" 
+                        className="ap-date-input"
+                        value={customStart}
+                        onChange={(e) => setCustomStart(e.target.value)}
+                        title="Data Início"
+                    />
+                    <span style={{color: 'rgba(255,255,255,0.5)', fontSize: 12}}>até</span>
+                    <input 
+                        type="date" 
+                        className="ap-date-input"
+                        value={customEnd}
+                        onChange={(e) => setCustomEnd(e.target.value)}
+                        title="Data Fim"
+                    />
+                    <button className="ap-btn-search" onClick={handleCustomSearch}>
+                        Buscar
+                    </button>
+                </div>
+            )}
           </div>
 
           <div className="ap-toggles-container">
@@ -436,15 +492,14 @@ export default function App({ signOut }: AppProps) {
             borderRadius: 16,
             border: "1px solid rgba(255,255,255,0.12)",
             background: "rgba(0,0,0,0.12)",
-            userSelect: "none", // Impede selecionar texto enquanto arrasta
+            userSelect: "none",
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ fontSize: 14, fontWeight: 700 }}>
-              Série temporal ({range === "ALL" ? "Histórico Completo" : range})
+              Série temporal ({range === "ALL" ? "Histórico Completo" : range === "CUSTOM" ? "Intervalo Personalizado" : range})
             </div>
             
-            {/* Botão de Reset só aparece se estiver com zoom */}
             {left !== "dataMin" && (
               <button 
                 onClick={zoomOut}
@@ -468,11 +523,10 @@ export default function App({ signOut }: AppProps) {
 
           {chartData.length < 2 ? (
             <div style={{ opacity: 0.7, padding: 12 }}>
-              {loading ? "Carregando dados..." : "Ainda sem pontos suficientes para o gráfico…"}
+              {loading ? "Carregando dados..." : "Aguardando dados ou seleção de intervalo..."}
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              {/* Eventos de Mouse no Gráfico */}
               <LineChart 
                 data={chartData}
                 onMouseDown={(e: any) => e && e.activeLabel && setRefAreaLeft(e.activeLabel)}
@@ -480,11 +534,9 @@ export default function App({ signOut }: AppProps) {
                 onMouseUp={zoom}
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                
-                {/* O Eixo X é controlado pelo estado left/right */}
                 <XAxis
                   dataKey="timestamp"
-                  allowDataOverflow={true} // NECESSÁRIO para o zoom funcionar
+                  allowDataOverflow={true}
                   domain={[left, right]}
                   type="number"
                   tickFormatter={(v: any) => formatTick(Number(v), range)}
@@ -500,7 +552,6 @@ export default function App({ signOut }: AppProps) {
                 />
                 <Legend />
 
-                {/* Linhas sem animação para o zoom ser instantâneo */}
                 {visible.TEMP && (
                   <Line type="monotone" dataKey="TEMP" name="Temperatura" dot={false} strokeWidth={2} stroke="#f97316" isAnimationActive={false} />
                 )}
@@ -517,13 +568,12 @@ export default function App({ signOut }: AppProps) {
                   <Line type="monotone" dataKey="POWER" name="Potência" dot={false} strokeWidth={2} stroke="#60a5fa" isAnimationActive={false} />
                 )}
 
-                {/* Retângulo de Seleção (Destaque visual) */}
                 {refAreaLeft && refAreaRight ? (
                   <ReferenceArea 
                     x1={refAreaLeft} 
                     x2={refAreaRight} 
                     strokeOpacity={0.3} 
-                    fill="rgba(255, 0, 0, 0.3)" /* Vermelho para teste de visibilidade */
+                    fill="rgba(255, 0, 0, 0.3)" 
                   />
                 ) : null}
 
